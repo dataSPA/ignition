@@ -1,0 +1,17 @@
+{
+  "name": "dataspa-ignition",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Fluent codec library and Datastar controller bridge for Lit web components",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "lit": "^3.0.0"
+  },
+  "devDependencies": {
+    "lit": "^3.3.2",
+    "typescript": "^6.0.2"
+  }
+}
