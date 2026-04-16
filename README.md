@@ -8,8 +8,7 @@ A Lit mixin and codec library for building [Lit](https://lit.dev) web components
 
 | File | Description |
 |---|---|
-| `datastar-watcher.ts` / `dist/datastar-watcher.js` | Lit class mixin that auto-tracks Datastar signals during render and re-renders on changes |
-| `codecs.ts` / `dist/codecs.js` | Fluent attribute codec system — typed, bidirectional string ↔ value conversion for `@property()`. Includes primitive codecs (`string`, `number`, `bool`, `date`, `json`, `js`, `bin`), chainable modifiers, and factory functions (`array`, `object`, `oneOf`) |
+| `datastar-watcher.ts` / `dist/datastar-watcher.js` | Lit class mixin that auto-tracks Datastar signals during render and re-renders on changes. Also exports the `@signalProperty` getter decorator for tracking signals outside of `render()` |
 | `datastar.d.ts` | TypeScript ambient declarations for the Datastar CDN import (required when vendoring `.ts` source) |
 
 ---
@@ -72,7 +71,7 @@ Wrap your `LitElement` class with `DatastarWatcher`. Any Datastar signal read in
 
 ```ts
 import { LitElement, html } from 'lit'
-import { DatastarWatcher } from './vendor/datastar-watcher.js'
+import { DatastarWatcher, signalProperty } from './vendor/datastar-watcher.js'
 
 class MyCounter extends DatastarWatcher(LitElement) {
   render() {
@@ -125,6 +124,38 @@ customElements.define('copy-button', CopyButton)
 | `this.patch(obj)` | Deep-merge a plain object into the signal store (RFC 7396): `this.patch({ user: { name: 'Alice' } })` |
 | `this.setSignals(entries)` | Write signals by dot-notation path: `this.setSignals([['user.name', 'Alice']])` |
 | `this.dsActions` | The global Datastar action registry (read-only): `this.dsActions.myAction(event)` |
+| `this.addEffect(fn)` | Register a persistent side-effect that tracks signals independently of the render cycle. Re-runs automatically when tracked signals change; disposed on disconnect and recreated on reconnect. Returns the dispose function |
+
+### `@signalProperty` decorator
+
+`@signalProperty` is a TC39 stage 3 getter decorator that wraps a getter in a managed Datastar effect. Any signals read inside the getter are tracked; when they change, `requestUpdate()` is called to schedule a re-render.
+
+Use it when a signal-derived value is consumed outside of `render()` — in lifecycle hooks, event handlers, or computed expressions — and you want changes to be noticed without reading the signal directly inside `render()`.
+
+```ts
+import { LitElement, html } from 'lit'
+import { DatastarWatcher, signalProperty } from './vendor/datastar-watcher.js'
+
+class MyProfile extends DatastarWatcher(LitElement) {
+  @signalProperty
+  get username() {
+    return this.dsRoot.user?.name ?? 'Guest'
+  }
+
+  render() {
+    // this.username is already tracked via @signalProperty — no need to read
+    // dsRoot.user directly here, though doing so is harmless.
+    return html`<p>Hello, ${this.username}</p>`
+  }
+}
+customElements.define('my-profile', MyProfile)
+```
+
+**Notes:**
+
+- Requires TC39 stage 3 decorator syntax — the default in TypeScript 5+. No `experimentalDecorators` compiler option is needed.
+- Can only be applied to getters on a class that extends `DatastarWatcher(...)`, since it relies on `this.addEffect` and `this.requestUpdate`.
+- Datastar deduplicates subscriptions, so reading the same signal inside `render()` as well is safe and has no performance cost.
 
 ---
 
