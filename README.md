@@ -41,7 +41,7 @@ Your bundler (Vite, Rollup, esbuild) resolves `lit` from your own `node_modules`
 ### Option B — Import the compiled JS from jsDelivr
 
 ```ts
-import { DatastarWatcher } from 'https://cdn.jsdelivr.net/gh/felixingram/dataspa-ignition@0.1.0/dist/datastar-watcher.js'
+import { DatastarWatcher } from 'https://cdn.jsdelivr.net/gh/dataSPA/ignition@0.1.0/dist/datastar-watcher.js'
 ```
 
 Again, no bundler config needed — URL imports are always treated as external.
@@ -135,19 +135,19 @@ Use with Lit's `@property()` decorator for typed, bidirectional HTML attribute h
 ```ts
 import { LitElement, html } from 'lit'
 import { property } from 'lit/decorators.js'
-import { rocketCodec, number, string, bool, oneOf } from './vendor/codecs.js'
+import { ignitionCodec, number, string, bool, oneOf } from './vendor/codecs.js'
 
 class ProgressBar extends LitElement {
-  @property(rocketCodec(number.clamp(0, 100).step(5)))
+  @property(ignitionCodec(number.clamp(0, 100).step(5)))
   accessor value = 0
 
-  @property(rocketCodec(string.trim.lower))
+  @property(ignitionCodec(string.trim.lower))
   accessor tone = 'neutral'
 
-  @property(rocketCodec(oneOf('light', 'dark', 'system')))
+  @property(ignitionCodec(oneOf('light', 'dark', 'system')))
   accessor theme = 'system'
 
-  @property(rocketCodec(bool))
+  @property(ignitionCodec(bool))
   accessor striped = false
 
   render() {
@@ -216,8 +216,8 @@ Chainable — e.g. `number.clamp(0, 100).step(5)`.
 Once a git tag is pushed, files are available at:
 
 ```
-https://cdn.jsdelivr.net/gh/felixingram/dataspa-ignition@<version>/dist/datastar-watcher.js
-https://cdn.jsdelivr.net/gh/felixingram/dataspa-ignition@<version>/dist/datastar-watcher.d.ts
-https://cdn.jsdelivr.net/gh/felixingram/dataspa-ignition@<version>/dist/codecs.js
-https://cdn.jsdelivr.net/gh/felixingram/dataspa-ignition@<version>/dist/codecs.d.ts
+https://cdn.jsdelivr.net/gh/dataSPA/ignition@<version>/dist/datastar-watcher.js
+https://cdn.jsdelivr.net/gh/dataSPA/ignition@<version>/dist/datastar-watcher.d.ts
+https://cdn.jsdelivr.net/gh/dataSPA/ignition@<version>/dist/codecs.js
+https://cdn.jsdelivr.net/gh/dataSPA/ignition@<version>/dist/codecs.d.ts
 ```

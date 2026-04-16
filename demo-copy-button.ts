@@ -1,12 +1,12 @@
 /**
- * demo-copy-button — Lit translation of the Rocket `demo-copy-button` example.
+ * demo-copy-button — Lit translation of the Ignition `demo-copy-button` example.
  *
- * This file is the canonical reference for translating a Rocket component that
+ * This file is the canonical reference for translating an Ignition component that
  * uses both local ($$) and global ($) Datastar signals into a Lit component.
  *
- * Rocket → Lit translation map
+ * Ignition → Lit translation map
  * ─────────────────────────────────────────────────────────────────────────────
- *  Rocket                                  Lit
+ *  Ignition                                Lit
  * ─────────────────────────────────────────────────────────────────────────────
  *  props.text        (string attr)         @property() accessor text
  *  props.resetMs     (number attr)         @property({ type: Number }) accessor resetMs
@@ -34,7 +34,7 @@
  *     In this example, dsActions.intl() is a built-in Datastar Pro action that
  *     formats a number using Intl.NumberFormat.
  *
- *   - Rocket action() scoping is internal-only; translate to a plain private
+ *   - Ignition action() scoping is internal-only; translate to a plain private
  *     class method. No registration or routing needed in Lit.
  *
  * Lifecycle approach (canonical — willUpdate):
@@ -55,8 +55,8 @@ import { property, state } from 'lit/decorators.js'
 import { DatastarWatcher } from './datastar-watcher.js'
 
 export class DemoCopyButton extends DatastarWatcher(LitElement) {
-  // ── Props (Rocket: props.text, props.resetMs) ─────────────────────────────
-  // These are reflected HTML attributes, just like Rocket's typed props.
+  // ── Props (Ignition: props.text, props.resetMs) ──────────────────────────
+  // These are reflected HTML attributes, just like Ignition's typed props.
 
   @property()
   accessor text: string = 'Copy me'
@@ -64,14 +64,14 @@ export class DemoCopyButton extends DatastarWatcher(LitElement) {
   @property({ type: Number })
   accessor resetMs: number = 1200
 
-  // ── Local state (Rocket: $$.copied) ───────────────────────────────────────
-  // Lit @state() replaces Rocket $$. It is instance-local and triggers
+  // ── Local state (Ignition: $$.copied) ────────────────────────────────────
+  // Lit @state() replaces Ignition $$. It is instance-local and triggers
   // re-render automatically. No global store involved.
 
   @state()
   accessor _copied: boolean = false
 
-  // ── Derived from a global action (Rocket: $$.resetMsLabel) ───────────────
+  // ── Derived from a global action (Ignition: $$.resetMsLabel) ────────────
   // dsActions.intl() is called with the current resetMs value. The result is
   // stored as a plain field and recomputed in willUpdate() whenever resetMs
   // changes. willUpdate() runs before every render(), so #resetMsLabel is
@@ -102,7 +102,7 @@ export class DemoCopyButton extends DatastarWatcher(LitElement) {
 
   #resetMsLabel: unknown = ''
 
-  // ── Timer handle (Rocket: let timerId) ───────────────────────────────────
+  // ── Timer handle (Ignition: let timerId) ─────────────────────────────────
 
   #timerId: number = 0
 
@@ -121,21 +121,21 @@ export class DemoCopyButton extends DatastarWatcher(LitElement) {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback()
-    // Rocket: cleanup(() => clearTimeout(timerId))
+    // Ignition: cleanup(() => clearTimeout(timerId))
     clearTimeout(this.#timerId)
   }
 
-  // ── Actions (Rocket: action('copy', async () => { … })) ──────────────────
+  // ── Actions (Ignition: action('copy', async () => { … })) ───────────────
   // Plain private async method. Bound arrow syntax so it can be passed
   // directly as an event listener without losing `this`.
 
   #copy = async (): Promise<void> => {
     await navigator.clipboard.writeText(this.text)
 
-    // Rocket: $$.copied = true  (local state write → Lit @state())
+    // Ignition: $$.copied = true  (local state write → Lit @state())
     this._copied = true
 
-    // Rocket: if ($.analyticsEnabled !== false) { $.lastCopiedText = props.text }
+    // Ignition: if ($.analyticsEnabled !== false) { $.lastCopiedText = props.text }
     // Global signal read + conditional global signal write via DatastarWatcher.
     if (this.dsRoot['analyticsEnabled'] !== false) {
       this.dsRoot['lastCopiedText'] = this.text
@@ -143,7 +143,7 @@ export class DemoCopyButton extends DatastarWatcher(LitElement) {
 
     clearTimeout(this.#timerId)
     this.#timerId = window.setTimeout(() => {
-      // Rocket: $$.copied = false  (local state write → Lit @state())
+      // Ignition: $$.copied = false  (local state write → Lit @state())
       this._copied = false
     }, this.resetMs)
   }
@@ -151,9 +151,9 @@ export class DemoCopyButton extends DatastarWatcher(LitElement) {
   // ── Render ────────────────────────────────────────────────────────────────
   // Pure Lit template — no data-* attributes, no Datastar expressions.
   //
-  //  Rocket: data-text="$$label"       → ${this._copied ? 'Copied' : 'Copy'}
-  //  Rocket: ($$resetMsLabel ms)        → ${this.#resetMsLabel} ms
-  //  Rocket: data-on:click="@copy()"   → @click=${this.#copy}
+  //  Ignition: data-text="$$label"       → ${this._copied ? 'Copied' : 'Copy'}
+  //  Ignition: ($$resetMsLabel ms)        → ${this.#resetMsLabel} ms
+  //  Ignition: data-on:click="@copy()"   → @click=${this.#copy}
 
   override render() {
     return html`

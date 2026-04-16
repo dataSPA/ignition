@@ -1,28 +1,28 @@
 /**
  * codecs.ts — Fluent attribute codec library for Lit web components.
  *
- * Replicates the Rocket `props` codec system as a standalone module, with no
- * dependency on the Rocket or Datastar Pro bundles. Use with Lit's
- * `@property()` decorator via the `rocketCodec()` bridge adapter.
+ * Ignition codecs — a standalone fluent attribute codec module, with no
+ * dependency on any third-party bundles. Use with Lit's
+ * `@property()` decorator via the `ignitionCodec()` bridge adapter.
  *
  * Quick-start
  * ──────────────────────────────────────────────────────────────────────────────
  *
- *   import { rocketCodec, number, string, bool, oneOf, array, object } from './codecs.js'
+ *   import { ignitionCodec, number, string, bool, oneOf, array, object } from './codecs.js'
  *   import { LitElement, html } from 'lit'
  *   import { property } from 'lit/decorators.js'
  *
  *   class DemoProgress extends LitElement {
- *     @property(rocketCodec(number.clamp(0, 100).step(5)))
+ *     @property(ignitionCodec(number.clamp(0, 100).step(5)))
  *     accessor value = 0
  *
- *     @property(rocketCodec(string.trim.lower))
+ *     @property(ignitionCodec(string.trim.lower))
  *     accessor tone = 'neutral'
  *
- *     @property(rocketCodec(oneOf('light', 'dark', 'system')))
+ *     @property(ignitionCodec(oneOf('light', 'dark', 'system')))
  *     accessor theme = 'system'
  *
- *     @property(rocketCodec(bool))
+ *     @property(ignitionCodec(bool))
  *     accessor striped = false
  *   }
  *
@@ -31,10 +31,10 @@
  *
  *   - Each codec implements { decode(unknown): T, encode(T): string }.
  *   - Codecs are immutable builders. Every transform method returns a new codec
- *     with the extra step layered on top — identical to the Rocket fluent API.
+ *     with the extra step layered on top — identical to the Ignition fluent API.
  *   - Defaults belong in the Lit accessor initializer (accessor value = 0),
  *     not in the codec chain. The codec handles normalisation only.
- *   - rocketCodec(codec) wraps any codec into a Lit PropertyDeclaration
+ *   - ignitionCodec(codec) wraps any codec into a Lit PropertyDeclaration
  *     options object that can be spread into @property().
  *
  * Codec reference
@@ -148,16 +148,16 @@ function makeCodec<T>(impl: Codec<T>): Codec<T> {
   return Object.freeze(Object.assign(Object.create(null) as object, impl)) as Codec<T>
 }
 
-// ── rocketCodec bridge ────────────────────────────────────────────────────────
+// ── ignitionCodec bridge ──────────────────────────────────────────────────────
 
 /**
  * Wrap a codec into a Lit `PropertyDeclaration` options object.
  *
  * Usage:
- *   @property(rocketCodec(number.clamp(0, 100)))
+ *   @property(ignitionCodec(number.clamp(0, 100)))
  *   accessor value = 0
  */
-export function rocketCodec<T>(codec: Codec<T>): {
+export function ignitionCodec<T>(codec: Codec<T>): {
   converter: {
     fromAttribute: (v: string | null) => T
     toAttribute: (v: T) => string

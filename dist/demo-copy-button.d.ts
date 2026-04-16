@@ -1,12 +1,12 @@
 /**
- * demo-copy-button — Lit translation of the Rocket `demo-copy-button` example.
+ * demo-copy-button — Lit translation of the Ignition `demo-copy-button` example.
  *
- * This file is the canonical reference for translating a Rocket component that
+ * This file is the canonical reference for translating an Ignition component that
  * uses both local ($$) and global ($) Datastar signals into a Lit component.
  *
- * Rocket → Lit translation map
+ * Ignition → Lit translation map
  * ─────────────────────────────────────────────────────────────────────────────
- *  Rocket                                  Lit
+ *  Ignition                                Lit
  * ─────────────────────────────────────────────────────────────────────────────
  *  props.text        (string attr)         @property() accessor text
  *  props.resetMs     (number attr)         @property({ type: Number }) accessor resetMs
@@ -34,7 +34,7 @@
  *     In this example, dsActions.intl() is a built-in Datastar Pro action that
  *     formats a number using Intl.NumberFormat.
  *
- *   - Rocket action() scoping is internal-only; translate to a plain private
+ *   - Ignition action() scoping is internal-only; translate to a plain private
  *     class method. No registration or routing needed in Lit.
  *
  * Lifecycle approach (canonical — willUpdate):
