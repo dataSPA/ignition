@@ -10,11 +10,22 @@
  *   - Exposes `this.patch(obj)` and `this.setSignals(entries)` as write helpers.
  *   - Exposes `this.dsActions` — the global Datastar action registry — so the
  *     component can imperatively call actions registered anywhere on the page.
+ *   - Exposes `this.addEffect(fn)` — creates a managed Datastar effect that is
+ *     automatically disposed on disconnect and recreated on reconnect.
+ *   - `@signalProperty` decorator — marks a getter as signal-derived, so that
+ *     changes to any Datastar signal read inside it trigger a re-render even
+ *     when the getter is not called from `render()`.
+ *   - Morph awareness — when Datastar's "fat morph" patches new DOM content
+ *     into the page, a MutationObserver on the host element's light DOM detects
+ *     the change and calls `requestUpdate()`, keeping the component in sync.
+ *     Controlled by `morphReactive` (default: true) and fully configurable via
+ *     `morphObserverInit`. Use `protectFromMorph(el)` to add `data-ignore-morph`
+ *     to elements that Datastar should leave untouched.
  *
  * Usage:
  *
  *   import { LitElement, html } from 'lit'
- *   import { DatastarWatcher } from './datastar-watcher.js'
+ *   import { DatastarWatcher, signalProperty } from './datastar-watcher.js'
  *
  *   class MyCounter extends DatastarWatcher(LitElement) {
  *     render() {
@@ -43,45 +54,103 @@
  *   first), so subscriptions always reflect the most recently rendered set of
  *   signals rather than a stale snapshot from a prior render.
  *
- *   On `disconnectedCallback`, the effect is disposed. On `connectedCallback`,
- *   `requestUpdate()` is called to force a fresh render (and therefore a fresh
- *   effect subscription) on reconnection.
+ *   On `disconnectedCallback`, the render effect and all managed effects are
+ *   disposed. On `connectedCallback`, `requestUpdate()` is called to force a
+ *   fresh render (and therefore a fresh render-effect subscription) on
+ *   reconnection, and all managed effects registered via `addEffect` are
+ *   recreated.
  *
- * Why a mixin rather than a controller?
+ * addEffect:
  *
- *   Both @lit-labs/preact-signals and @lit-labs/signals implement this pattern
- *   as a mixin. A mixin overrides `performUpdate` via `super`, which means
- *   multiple mixins can compose correctly through the prototype chain. A
- *   controller that monkey-patches the host's `performUpdate` at the instance
- *   level would clobber any other such patch and cannot compose.
+ *   `addEffect(fn)` creates a Datastar effect that runs immediately and is
+ *   tracked independently of the render cycle. This is useful for side-effects
+ *   that should respond to signal changes outside of `render()` — for example
+ *   imperatively updating a third-party chart, syncing to localStorage, or
+ *   logging. The effect function is stored so it can be recreated automatically
+ *   on reconnection. `addEffect` returns the dispose function, which can be
+ *   called early to unsubscribe before the element disconnects.
+ *
+ * @signalProperty:
+ *
+ *   A TC39 stage 3 getter decorator that wraps the getter in a managed effect.
+ *   Any Datastar signals read by the getter are tracked; when they change, the
+ *   element's `requestUpdate()` is called to schedule a re-render. This ensures
+ *   the getter always reflects the latest signal state even when it is called
+ *   from lifecycle hooks, event handlers, or computed expressions rather than
+ *   directly from `render()`.
+ *
+ *   Example:
+ *
+ *     class MyProfile extends DatastarWatcher(LitElement) {
+ *       @signalProperty
+ *       get username() {
+ *         return this.dsRoot.user?.name ?? 'Guest'
+ *       }
+ *
+ *       render() {
+ *         return html`<p>Hello, ${this.username}</p>`
+ *       }
+ *     }
+ *
+ *   Because `username` is already tracked through the managed effect, it does
+ *   not need to be read directly inside `render()` for changes to be noticed —
+ *   though doing so is harmless (Datastar deduplicates subscriptions).
+ *
+ * Morph awareness:
+ *
+ *   Datastar's "fat morph" approach patches large HTML fragments from the
+ *   server directly into the live DOM, morphing existing nodes in place rather
+ *   than replacing them wholesale. For a Lit component this means the host
+ *   element's light DOM children (slotted content), their descendant attributes,
+ *   or their text content may be mutated externally — outside of Lit's own
+ *   update cycle — and Lit would have no way to know.
+ *
+ *   The mixin wires up a `MutationObserver` on the host element that watches
+ *   for any such external mutations and calls `requestUpdate()` in response,
+ *   ensuring the component re-renders to reflect the new light DOM state.
+ *
+ *   Three protected members control this behaviour:
+ *
+ *   `morphReactive` (default: `true`) — set to `false` on any component that
+ *   should not observe morph changes, e.g. one that renders only to shadow DOM
+ *   and has no interest in its light DOM children.
+ *
+ *   `morphObserverInit` — the `MutationObserverInit` options passed to the
+ *   observer. The default covers all mutation types that morphing can produce:
+ *
+ *     { childList: true, subtree: true, attributes: true, characterData: true }
+ *
+ *   Override to narrow the scope (e.g. `{ childList: true }`) if only coarse
+ *   child add/remove events are needed and performance is a concern.
+ *
+ *   `protectFromMorph(el)` — adds the `data-ignore-morph` attribute to `el`,
+ *   instructing Datastar's morphing algorithm to skip that element entirely.
+ *   Useful when a component renders light DOM that must not be touched by the
+ *   server (e.g. purely client-rendered interactive sub-trees).
+ *
+ *   The observer is automatically connected on `connectedCallback` and
+ *   disconnected on `disconnectedCallback`, matching the effect lifecycle.
+ *   Mutations caused by Lit's own update cycle are suppressed via an
+ *   `#isUpdating` guard so they do not re-trigger the observer.
  *
  * Datastar version: 1.0.0-RC.8
  *
  * This file assumes Datastar is already loaded on the page and exposed via the
  * 'datastar' module specifier (e.g. through an import map).
  */
-import { ReactiveElement } from 'lit';
-import { root, actions } from 'datastar';
-import type { JSONPatch, MergePatchArgs, Paths } from 'datastar';
+import type { Effect, JSONPatch, MergePatchArgs, Paths } from "datastar";
+import { actions, root } from "datastar";
+import type { ReactiveElement } from "lit";
 type Constructor<T = object> = new (...args: any[]) => T;
-/**
- * Interface describing the members that DatastarWatcher mixes into the class.
- * Declared separately so that TypeScript consumers can reference it when they
- * need to widen a type or declare an interface that includes these members.
- */
 export interface DatastarWatcherInterface {
     readonly dsRoot: typeof root;
     patch(obj: JSONPatch, opts?: MergePatchArgs): void;
     setSignals(entries: Paths, opts?: MergePatchArgs): void;
     readonly dsActions: typeof actions;
+    addEffect(fn: () => void): Effect;
+    protectFromMorph(el: Element): void;
 }
-/**
- * DatastarWatcher mixin.
- *
- * @param Base - A class that extends ReactiveElement (e.g. LitElement).
- * @returns    - An abstract subclass of Base with Datastar signal tracking
- *               and the dsRoot / patch / setSignals / dsActions helpers mixed in.
- */
 export declare function DatastarWatcher<T extends Constructor<ReactiveElement>>(Base: T): T & Constructor<DatastarWatcherInterface>;
+export declare function signalProperty<This extends ReactiveElement & DatastarWatcherInterface, V>(getter: (this: This) => V, context: ClassGetterDecoratorContext<This, V>): void;
 export {};
 //# sourceMappingURL=datastar-watcher.d.ts.map

@@ -121,7 +121,7 @@ let DemoCopyButton = (() => {
         get resetMs() { return this.#resetMs_accessor_storage; }
         set resetMs(value) { this.#resetMs_accessor_storage = value; }
         #_copied_accessor_storage = (__runInitializers(this, _resetMs_extraInitializers), __runInitializers(this, __copied_initializers, false
-        // ── Derived from a global action (Ignition: $$.resetMsLabel) ─────────────
+        // ── Derived from a global action (Ignition: $$.resetMsLabel) ────────────
         // dsActions.intl() is called with the current resetMs value. The result is
         // stored as a plain field and recomputed in willUpdate() whenever resetMs
         // changes. willUpdate() runs before every render(), so #resetMsLabel is
@@ -155,7 +155,7 @@ let DemoCopyButton = (() => {
         // re-render automatically. No global store involved.
         get _copied() { return this.#_copied_accessor_storage; }
         set _copied(value) { this.#_copied_accessor_storage = value; }
-        // ── Derived from a global action (Ignition: $$.resetMsLabel) ─────────────
+        // ── Derived from a global action (Ignition: $$.resetMsLabel) ────────────
         // dsActions.intl() is called with the current resetMs value. The result is
         // stored as a plain field and recomputed in willUpdate() whenever resetMs
         // changes. willUpdate() runs before every render(), so #resetMsLabel is

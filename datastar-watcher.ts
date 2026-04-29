@@ -15,6 +15,12 @@
  *   - `@signalProperty` decorator — marks a getter as signal-derived, so that
  *     changes to any Datastar signal read inside it trigger a re-render even
  *     when the getter is not called from `render()`.
+ *   - Morph awareness — when Datastar's "fat morph" patches new DOM content
+ *     into the page, a MutationObserver on the host element's light DOM detects
+ *     the change and calls `requestUpdate()`, keeping the component in sync.
+ *     Controlled by `morphReactive` (default: true) and fully configurable via
+ *     `morphObserverInit`. Use `protectFromMorph(el)` to add `data-ignore-morph`
+ *     to elements that Datastar should leave untouched.
  *
  * Usage:
  *
@@ -90,6 +96,43 @@
  *   not need to be read directly inside `render()` for changes to be noticed —
  *   though doing so is harmless (Datastar deduplicates subscriptions).
  *
+ * Morph awareness:
+ *
+ *   Datastar's "fat morph" approach patches large HTML fragments from the
+ *   server directly into the live DOM, morphing existing nodes in place rather
+ *   than replacing them wholesale. For a Lit component this means the host
+ *   element's light DOM children (slotted content), their descendant attributes,
+ *   or their text content may be mutated externally — outside of Lit's own
+ *   update cycle — and Lit would have no way to know.
+ *
+ *   The mixin wires up a `MutationObserver` on the host element that watches
+ *   for any such external mutations and calls `requestUpdate()` in response,
+ *   ensuring the component re-renders to reflect the new light DOM state.
+ *
+ *   Three protected members control this behaviour:
+ *
+ *   `morphReactive` (default: `true`) — set to `false` on any component that
+ *   should not observe morph changes, e.g. one that renders only to shadow DOM
+ *   and has no interest in its light DOM children.
+ *
+ *   `morphObserverInit` — the `MutationObserverInit` options passed to the
+ *   observer. The default covers all mutation types that morphing can produce:
+ *
+ *     { childList: true, subtree: true, attributes: true, characterData: true }
+ *
+ *   Override to narrow the scope (e.g. `{ childList: true }`) if only coarse
+ *   child add/remove events are needed and performance is a concern.
+ *
+ *   `protectFromMorph(el)` — adds the `data-ignore-morph` attribute to `el`,
+ *   instructing Datastar's morphing algorithm to skip that element entirely.
+ *   Useful when a component renders light DOM that must not be touched by the
+ *   server (e.g. purely client-rendered interactive sub-trees).
+ *
+ *   The observer is automatically connected on `connectedCallback` and
+ *   disconnected on `disconnectedCallback`, matching the effect lifecycle.
+ *   Mutations caused by Lit's own update cycle are suppressed via an
+ *   `#isUpdating` guard so they do not re-trigger the observer.
+ *
  * Datastar version: 1.0.0-RC.8
  *
  * This file assumes Datastar is already loaded on the page and exposed via the
@@ -109,6 +152,7 @@ export interface DatastarWatcherInterface {
   setSignals(entries: Paths, opts?: MergePatchArgs): void;
   readonly dsActions: typeof actions;
   addEffect(fn: () => void): Effect;
+  protectFromMorph(el: Element): void;
 }
 
 export function DatastarWatcher<T extends Constructor<ReactiveElement>>(
@@ -121,6 +165,30 @@ export function DatastarWatcher<T extends Constructor<ReactiveElement>>(
 
     #effectDisposers: Set<Effect> = new Set();
 
+    #morphObserver: MutationObserver | undefined;
+
+    // True while Lit's own update cycle is running; used to suppress
+    // MutationObserver callbacks that are caused by Lit itself.
+    #isUpdating = false;
+
+    // ── Morph awareness configuration ─────────────────────────────────────
+
+    /** Set to `false` to disable morph observation on this component. */
+    protected morphReactive = true;
+
+    /**
+     * Options passed to the internal `MutationObserver`. The default covers
+     * every mutation type that Datastar's morphing algorithm can produce.
+     * Override to narrow the scope when a component only cares about a subset
+     * of mutations (e.g. `{ childList: true }` for coarse add/remove only).
+     */
+    protected morphObserverInit: MutationObserverInit = {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      characterData: true,
+    };
+
     // ── Lit lifecycle hooks ────────────────────────────────────────────────
 
     override connectedCallback(): void {
@@ -129,6 +197,18 @@ export function DatastarWatcher<T extends Constructor<ReactiveElement>>(
       // Recreate all managed effects that were disposed on disconnection.
       for (const fn of this.#effectFns) {
         this.#effectDisposers.add(effect(fn));
+      }
+
+      // Wire up morph awareness: observe the host element's light DOM for any
+      // mutations caused by Datastar's morphing algorithm and schedule a
+      // re-render in response.
+      if (this.morphReactive) {
+        this.#morphObserver = new MutationObserver(() => {
+          if (!this.#isUpdating) {
+            this.requestUpdate();
+          }
+        });
+        this.#morphObserver.observe(this, this.morphObserverInit);
       }
 
       // Force a fresh render on reconnection so the render effect picks up the
@@ -143,14 +223,19 @@ export function DatastarWatcher<T extends Constructor<ReactiveElement>>(
 
       let updateFromLit = true;
 
-      this.#renderDispose = effect(() => {
-        if (updateFromLit) {
-          updateFromLit = false;
-          super.performUpdate();
-        } else {
-          this.requestUpdate();
-        }
-      });
+      this.#isUpdating = true;
+      try {
+        this.#renderDispose = effect(() => {
+          if (updateFromLit) {
+            updateFromLit = false;
+            super.performUpdate();
+          } else {
+            this.requestUpdate();
+          }
+        });
+      } finally {
+        this.#isUpdating = false;
+      }
     }
 
     override disconnectedCallback(): void {
@@ -159,6 +244,9 @@ export function DatastarWatcher<T extends Constructor<ReactiveElement>>(
 
       this.#renderDispose?.();
       this.#renderDispose = undefined;
+
+      this.#morphObserver?.disconnect();
+      this.#morphObserver = undefined;
 
       super.disconnectedCallback();
     }
@@ -194,6 +282,16 @@ export function DatastarWatcher<T extends Constructor<ReactiveElement>>(
       };
 
       return wrappedDispose;
+    }
+
+    /**
+     * Adds the `data-ignore-morph` attribute to the given element, instructing
+     * Datastar's morphing algorithm to leave it untouched. Call this in
+     * `firstUpdated` or `updated` for any light DOM element that the component
+     * manages itself and that must not be overwritten by server-sent fragments.
+     */
+    protectFromMorph(el: Element): void {
+      el.setAttribute("data-ignore-morph", "");
     }
   }
 
